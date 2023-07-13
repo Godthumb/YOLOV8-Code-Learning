@@ -33,7 +33,7 @@ labels = torch.tensor(np.array([[0, 1.0, 0.612, 0.334, 0.666, 0.378],
 - 该标注框是YOLO的标准输入格式，为(n ,6)的矩阵。分别代表该图片在该batch中的索引、类别、归一化中心点x坐标、归一化中心点y坐标、归一化宽、归一化高。给出的labels来自实际任务，为人体的标注框。
 
 ### 整体目的
-在了解输入后，应该明白整个正负样本分配的目的。在此之前，需要知道网络模型的预测输出大小，输出同样有两个，一个为预测分数，shape为(b, anchor_num=56, cls_num=3); 另一个为预测坐标， shape为(b, anchor_num=56, 4), 而<u>整个正负样本分配的目的就是将labels变化成同上述矩阵相同的大小</u>，即最后输出target_scores的shape为(b, anchor_num=56, cls_num=3)， target_bboxes为(b, anchor_num=56, 4)，<u>完成为每一个anchor给予标签的作用。</u>
+在了解输入后，应该明白整个正负样本分配的目的。在此之前，需要知道网络模型的预测输出大小，输出同样有两个，一个为预测分数，shape为(b, anchor_num=56, cls_num=3); 另一个为预测坐标， shape为(b, anchor_num=56, 4), 而*整个正负样本分配的目的就是将labels变化成同上述矩阵相同的大小*，即最后输出target_scores的shape为(b, anchor_num=56, cls_num=3)， target_bboxes为(b, anchor_num=56, 4)，*完成为每一个anchor给予标签的作用。*
 
 ### 整体流程概览
 
