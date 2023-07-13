@@ -2,12 +2,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 # import matplotlib.patches as patches
 
-input1 = np.array([[0.5000, 0.5000],
+f_2x2 = np.array([[0.5000, 0.5000],
                  [1.5000, 0.5000],
                  [0.5000, 1.5000],
                  [1.5000, 1.5000]])
 
-input2 = np.array(   [[0.5000, 0.5000],
+f_4x4 = np.array(   [[0.5000, 0.5000],
         [1.5000, 0.5000],
         [2.5000, 0.5000],
         [3.5000, 0.5000],
@@ -24,7 +24,7 @@ input2 = np.array(   [[0.5000, 0.5000],
         [2.5000, 3.5000],
         [3.5000, 3.5000],])
 
-input3 = np.array([[0.5000, 0.5000],
+f_8x8 = np.array([[0.5000, 0.5000],
         [1.5000, 0.5000],
         [2.5000, 0.5000],
         [3.5000, 0.5000],
@@ -91,40 +91,35 @@ input3 = np.array([[0.5000, 0.5000],
 
 fig, axes = plt.subplots(2, 2, figsize=(10, 10))
 
-
-
-rect1=plt.Rectangle(
+rect_2x2 = plt.Rectangle(
             (0, 0),  # (x,y)矩形左下角
             2,  # width长
             2,  # height宽
             color='black',
             alpha=0.5      )
 
-axes[0, 0].add_patch(rect1)
-axes[0, 0].scatter(input1[:, 0], input1[:, 1])
+axes[0, 0].add_patch(rect_2x2)
+axes[0, 0].scatter(f_2x2[:, 0], f_2x2[:, 1])
 
-rect2=plt.Rectangle(
+rect_4x4 = plt.Rectangle(
             (0, 0),  # (x,y)矩形左下角
             4,  # width长
             4,  # height宽
             color='black',
             alpha=0.5      )
 
-axes[0, 1].add_patch(rect2)
-axes[0, 1].scatter(input2[:, 0], input2[:, 1])
+axes[0, 1].add_patch(rect_4x4)
+axes[0, 1].scatter(f_4x4[:, 0], f_4x4[:, 1])
 
-rect3 = plt.Rectangle(
+rect_8x8 = plt.Rectangle(
             (0, 0),  # (x,y)矩形左下角
             8,  # width长
             8,  # height宽
             color='black',
             alpha=0.5      )
 
-axes[1, 0].add_patch(rect3)
-axes[1, 0].scatter(input3[:, 0], input3[:, 1])
-
-
-
+axes[1, 0].add_patch(rect_8x8)
+axes[1, 0].scatter(f_8x8[:, 0], f_8x8[:, 1])
 plt.savefig('out.png')
 
 
