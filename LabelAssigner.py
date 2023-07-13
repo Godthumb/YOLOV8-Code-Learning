@@ -123,7 +123,7 @@ class LabelAssigner(object):
             # (b, 8400, 4)
             pred_regs = pred_regs.matmul(self.proj.type(torch.float32))
 
-        # 此时的regs, shape-> bx8400x4,其中4表示 anc_point中心点分别距离预测box的左上边与右下边的距离
+        # 此时的regs, shape-> (b，8400, 4),其中4表示 anc_point中心点分别距离预测box的左上边与右下边的距离
         lt = pred_regs[..., :2]
         rb = pred_regs[..., 2:]
         # xmin ymin 
@@ -172,7 +172,7 @@ class TaskAlignedAssigner(object):
        self.eps = eps
        self.nc = num_classes
        self.n_max_boxes = 3
-       self.na = 56
+       self.na = 84
        self.alpha = alpha
        self.beta = beta
        self.topk = topk
@@ -382,8 +382,8 @@ if __name__ == '__main__':
     #           torch.randn(4, 67, 40, 40),
     #           torch.randn(4, 67, 20, 20)
     #           ]  # b=4
-    # fake input na = 56
-    inputs = [torch.randn(4, 67, 6, 6),
+    # fake input na = 84
+    inputs = [torch.randn(4, 67, 8, 8),
               torch.randn(4, 67, 4, 4),
               torch.randn(4, 67, 2, 2)
               ]  # b=4
