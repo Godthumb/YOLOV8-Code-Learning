@@ -187,6 +187,7 @@ tensor([[0.5000, 0.5000],
         [0.5000, 1.5000],
         [1.5000, 1.5000]])
 ```
+可视化上述坐标点在三个尺度的特征图上
 ![](assets/out.png)
 - strides_tensor: (8400, 1) ，每个像素的缩放倍数
 ```
@@ -306,6 +307,107 @@ def decode(self, pred_regs):
     pred_bboxes = torch.cat([x1y1, x2y2], dim=-1)
     return pred_bboxes
 ```
-- 
+- 预测坐标位置，首先通过对16个分布值加权求和，得到的4个坐标值*表示anc_point中心点分别距离预测box的左上边(lt)与右下边(rb)的距离*, 然后转换为xmin, ymin, xmax, ymax的形式，方便后续的ciou的计算pred_bboxes.shape (b, 8400, 4), *这里可以看到预测结果实际是个相对值， 且此时的4个值都在特征值尺度下*。 
+
+#### 2.标注结果预处理
+```
+def ann_process(self, annotations):
+    '''
+        batch内不同图像标注box个数可能不同，故进行对齐处理
+        1. 按照batch内的最大box数目M,新建全0tensor
+        2. 然后将实际标注数据填充与前面，如后面为0，则说明不足M，用0补齐
+    '''
+    # 获取batch内每张图像标注box的bacth_idx
+    batch_idx = annotations[:, 0]
+    # 计算每张图像中标注框的个数
+    # 原理对tensor内相同值进行汇总
+    _, counts = batch_idx.unique(return_counts=True)
+    counts = counts.type(torch.int32)
+    # 按照batch内最大M个GT创新全0的tensor (b, M, 5), 其中5 = (cls, cx, cy, width, height)
+    res = torch.zeros(self.bs, counts.max(), 5).type(torch.float32)
+    for j in range(self.bs):
+        matches = batch_idx == j 
+        n = matches.sum()
+        if n: 
+            res[j, :n] = annotations[matches, 1:]
+    # res 为归一化之后的结果, 需通过scales映射回输入尺度
+    scales = [self.input_w, self.input_h, self.input_w, self.input_h]
+    scales = torch.tensor(scales).type(torch.float32)
+    res[..., 1:5] = xywh2xyxy(res[..., 1:5]).mul_(scales)
+    # gt_labels (b, M, 1)
+    # gt_bboxes （b, M, 4）
+    gt_labels, gt_bboxes = res[..., :1], res[..., 1:]
+    # gt_mask (b, M, 1)
+    # 通过对四个坐标值相加，如果为0，则说明该gt信息为填充信息，在mask中为False，
+    # 后期计算过程中会进行过滤
+    gt_mask = gt_bboxes.sum(2, keepdim=True).gt_(0)
+    return gt_bboxes, gt_labels, gt_mask
+
+```
+整个过程可以图解如下：</br>
+(原图来自[https://zhuanlan.zhihu.com/p/633094573](https://zhuanlan.zhihu.com/p/633094573)）</br>
+![](assets/label.jpg)</br>
+这里以batch=2举例，类别数为80。第一张图片有2个目标，第二张图片有5个目标
+
+![](assets/inner.jpg)</br>
+输出结果</br>
+![](assets/res.jpg)
+- 标注框坐标 gt_bboxes.shape (b, M, 4), 注意这里已经是原图尺度了
+```
+tensor([[[ 1.7856e+02,  9.2800e+01,  6.0480e+02,  3.3472e+02],
+         [ 2.1760e+02, -3.2000e-01,  4.9024e+02,  6.9440e+01],
+         [ 0.0000e+00,  0.0000e+00,  0.0000e+00,  0.0000e+00]],
+
+        [[ 5.3440e+01,  9.2480e+01,  5.3152e+02,  3.2224e+02],
+         [ 0.0000e+00,  0.0000e+00,  0.0000e+00,  0.0000e+00],
+         [ 0.0000e+00,  0.0000e+00,  0.0000e+00,  0.0000e+00]],
+
+        [[ 4.8000e+02,  2.0896e+02,  6.4000e+02,  4.1056e+02],
+         [ 5.7600e+01,  9.8880e+01,  5.1840e+02,  3.6192e+02],
+         [ 2.5600e+01,  2.5600e+00,  3.2000e+02,  7.9360e+01]],
+
+        [[ 1.7440e+02,  2.5760e+02,  2.7104e+02,  4.0928e+02],
+         [ 0.0000e+00,  0.0000e+00,  0.0000e+00,  0.0000e+00],
+         [ 0.0000e+00,  0.0000e+00,  0.0000e+00,  0.0000e+00]]])
+```
+- 标注框类别 gt_labels.shape (b, M, 1)
+```
+tensor([[[1.],
+         [0.],
+         [0.]],
+
+        [[1.],
+         [0.],
+         [0.]],
+
+        [[2.],
+         [1.],
+         [0.]],
+
+        [[2.],
+         [0.],
+         [0.]]])
+```
+- 是否为填充的标注框 gt_mask.shape (b, M, 1)
+```
+tensor([[[1.],
+         [1.],
+         [0.]],
+
+        [[1.],
+         [0.],
+         [0.]],
+
+        [[1.],
+         [1.],
+         [1.]],
+
+        [[1.],
+         [0.],
+         [0.]]])
+```
+
+#### 3.正负样本分配
+
 ## Acknowledgement
 感谢[https://zhuanlan.zhihu.com/p/633094573](https://zhuanlan.zhihu.com/p/633094573)，本文根据该知乎讲解进行整理
