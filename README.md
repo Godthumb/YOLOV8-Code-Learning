@@ -41,10 +41,10 @@ labels = torch.tensor(np.array([[0, 1.0, 0.612, 0.334, 0.666, 0.378],
 - 标注结果预处理: ann_process
 - 正负样本分配: TaskAlignedAssigner()
 
-#### 1.预测结果预处理
+#### 1. 预测结果预处理
 注意：下述注释中的8400等同于84, stride大小[8, 16, 32]等同于[80, 160, 320]
 这里我懒得修改注释了
-##### 1.1 预测结果整合
+##### i. 预测结果整合
 ```
 def pred_process(self, inputs):
     '''     
@@ -75,7 +75,7 @@ def pred_process(self, inputs):
 - 预测的回归分布(需要通过解码转换到标准的4维输出上) pred_regs.shape (b, 8400, 16 * 4)
 - 每个特征图的下采样倍率，后续用来恢复每个特征图的输出结果到原图尺度上 strides: [8, 16, 32]
 
-##### 1.2 anchors锚点
+##### ii. anchors锚点
 ```
 def make_anchors(self, strides, grid_cell_offset=0.5):
     '''
@@ -277,7 +277,7 @@ tensor([[ 80.],
         [320.]])
 ```
 
-##### 1.3 解码预测回归分布
+##### iii. 解码预测回归分布
 ```
 def decode(self, pred_regs):
     '''
@@ -309,7 +309,7 @@ def decode(self, pred_regs):
 ```
 - 预测坐标位置，首先通过对16个分布值加权求和，得到的4个坐标值*表示anc_point中心点分别距离预测box的左上边(lt)与右下边(rb)的距离*, 然后转换为xmin, ymin, xmax, ymax的形式，方便后续的ciou的计算pred_bboxes.shape (b, 8400, 4), *这里可以看到预测结果实际是个相对值， 且此时的4个值都在特征值尺度下*。 
 
-#### 2.标注结果预处理
+#### 2. 标注结果预处理
 ```
 def ann_process(self, annotations):
     '''
@@ -407,7 +407,8 @@ tensor([[[1.],
          [0.]]])
 ```
 
-#### 3.正负样本分配
+#### 3. 正负样本分配
+下面进入最重要的部分，正负样本分配。
 
 ## Acknowledgement
 感谢[https://zhuanlan.zhihu.com/p/633094573](https://zhuanlan.zhihu.com/p/633094573)，本文根据该知乎讲解进行整理
