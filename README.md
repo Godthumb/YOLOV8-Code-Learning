@@ -897,5 +897,30 @@ tensor([[ 2.1760e+02, -3.2000e-01,  4.9024e+02,  6.9440e+01],
         [ 1.7856e+02,  9.2800e+01,  6.0480e+02,  3.3472e+02],
         [ 1.7856e+02,  9.2800e+01,  6.0480e+02,  3.3472e+02]])
 ```
+注意这里target_score有用fg_mask进行过滤，但是target_bboxes没有处理。实际计算loss的时候才会用fg_mask对target_bboxes进行过滤。
+```
+class BboxLoss(nn.Module):
+    def __init__(self, reg_max, use_dfl=False):
+        """Initialize the BboxLoss module with regularization maximum and DFL settings."""
+        super().__init__()
+        self.reg_max = reg_max
+        self.use_dfl = use_dfl
+
+    def forward(self, pred_dist, pred_bboxes, anchor_points, target_bboxes, target_scores, target_scores_sum, fg_mask):
+        """IoU loss."""
+        weight = torch.masked_select(target_scores.sum(-1), fg_mask).unsqueeze(-1)
+        iou = bbox_iou(pred_bboxes[fg_mask], target_bboxes[fg_mask], xywh=False, CIoU=True)
+        loss_iou = ((1.0 - iou) * weight).sum() / target_scores_sum
+
+        # DFL loss
+        if self.use_dfl:
+            target_ltrb = bbox2dist(anchor_points, target_bboxes, self.reg_max)
+            loss_dfl = self._df_loss(pred_dist[fg_mask].view(-1, self.reg_max + 1), target_ltrb[fg_mask]) * weight
+            loss_dfl = loss_dfl.sum() / target_scores_sum
+        else:
+            loss_dfl = torch.tensor(0.0).to(pred_dist.device)
+
+        return loss_iou, loss_dfl
+```
 ## Acknowledgement
 感谢[https://zhuanlan.zhihu.com/p/633094573](https://zhuanlan.zhihu.com/p/633094573)，本文根据该知乎讲解进行整理
