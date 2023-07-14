@@ -46,7 +46,7 @@ class LabelAssigner(object):
         # 每个gt box 最多选择topk个候选框作为正样本
         self.assigner = TaskAlignedAssigner(topk=10, num_classes=self.nc, alpha=0.5, beta=6.0)
         # ----------- 正负样本筛选 ------------ #
-        target_bboxes, target_scores, fg_mask= self.assigner(pred_scores.detach().sigmoid(),
+        target_bboxes, target_scores, fg_mask = self.assigner(pred_scores.detach().sigmoid(),
                                                              pred_bboxes.detach() * self.stride_scales,
                                                              self.anc_points * self.stride_scales,
                                                              gt_labels,

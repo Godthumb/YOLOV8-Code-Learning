@@ -408,7 +408,59 @@ tensor([[[1.],
 ```
 
 #### 3. 正负样本分配
-下面进入最重要的部分，正负样本分配。
+下面进入最重要的部分，正负样本分配。在开始进入流程之前，先来看下我们的输入都有什么。
+```
+target_bboxes, target_scores, fg_mask = self.assigner(pred_scores.detach().sigmoid(),
+                                                      pred_bboxes.detach() * self.stride_scales,
+                                                      self.anc_points * self.stride_scales,
+                                                      gt_labels,
+                                                      gt_bboxes,
+                                                      gt_mask)
+```
+- pred_scores.detach().sigmoid()： 经过sigmoid处理的网络类别预测分数, shape(b, 8400, 3)
+- pred_bboxes.detach() * self.stride_scales: 转换到原始尺度的网络预测框, shape(b, 8400, 4) 
+- self.anc_points * self.stride_scales: 转换到原始尺度的网格中心点, shape (8400, 2)
+- gt_labels: 标注框类别, shape(b, M, 1)
+- gt_bboxes: 标注框坐标, shape(b, M, 4)
+- gt_mask: 掩码，判断gt中是否是填充信息, shape(b, M, 1)
+
+##### a.初步筛选
+assigner实际输入是有batch这个维度的，为了方便，实际代码中会对这个batch进行遍历，循环处理每一张图片，因此下面讲解的过程都可认为是对一张图片做的处理, 不需要考虑batch这个维度。</br>
+原则：*anchor_points落在gt_boxes内部，作为初步筛选的正样本。*
+```
+def __get_in_gts_mask(self,gt_bboxes,anc_points):
+    # 找到M个GTBox的左上与右下坐标 M x 1 x 2
+    gt_bboxes = gt_bboxes.view(-1,1,4)
+    lt,rb = gt_bboxes[...,:2],gt_bboxes[...,2:]
+    # anc_points 增加一个维度 1 x 8400 x 2 
+    anc_points = anc_points.view(1,-1,2)
+    # 差值结果 M x 8400 x 4 
+    bbox_detals = torch.cat([anc_points - lt,rb - anc_points],dim=-1)
+    # 第三个维度均大于0才说明在gt内部
+    # M x 8400
+    in_gts_mask = bbox_detals.amin(2).gt_(self.eps)
+    return in_gts_mask 
+```
+这里判断方式很简单，计算M个GT左上坐标和anc_points的距离，以及右下坐标和anc_points的距离，如果最小值都大于0,则说明该anchor_point落在了GT框中。
+- in_gts_mask.shape(M, 8400) 表示该anc_points是否落在GT中
+```
+tensor([[0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 1., 1., 1., 1., 1., 0., 0.,
+         1., 1., 1., 1., 1., 1., 0., 0., 1., 1., 1., 1., 1., 1., 0., 0., 0., 0.,
+         0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+         0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 1., 1.,
+         0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 0.],
+        [0., 0., 0., 1., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+         0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+         0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+         0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+         0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+        [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+         0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+         0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+         0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+         0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]])
+```
+##### b.精细筛选
 
 ## Acknowledgement
 感谢[https://zhuanlan.zhihu.com/p/633094573](https://zhuanlan.zhihu.com/p/633094573)，本文根据该知乎讲解进行整理
