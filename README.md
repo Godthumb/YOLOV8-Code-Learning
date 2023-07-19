@@ -10,7 +10,7 @@ python LabelAssigner.py
 ## 具体过程
 ### 输入
 #### 输入有两个，一个是YOLOV8 NECK的三层输出
-```
+```python
 inputs = [torch.randn(4, 67, 8, 8),
               torch.randn(4, 67, 4, 4),
               torch.randn(4, 67, 2, 2)
@@ -21,7 +21,7 @@ inputs = [torch.randn(4, 67, 8, 8),
 - 假设batch = 4
 
 #### 另一个输入是标注框
-```
+```python
 labels = torch.tensor(np.array([[0, 1.0, 0.612, 0.334, 0.666, 0.378],
                                     [0, 0.0, 0.553, 0.054, 0.426, 0.109],
                                     [1, 1.0, 0.457, 0.324, 0.747, 0.359],
@@ -45,7 +45,7 @@ labels = torch.tensor(np.array([[0, 1.0, 0.612, 0.334, 0.666, 0.378],
 注意：下述注释中的8400等同于84, stride大小[8, 16, 32]等同于[80, 160, 320]
 这里我懒得修改注释了
 ##### i. 预测结果整合
-```
+```python
 def pred_process(self, inputs):
     '''     
     L = class_num + 4 * self.reg_max = class_num + 64
@@ -76,7 +76,7 @@ def pred_process(self, inputs):
 - 每个特征图的下采样倍率，后续用来恢复每个特征图的输出结果到原图尺度上 strides: [8, 16, 32]
 
 ##### ii. anchors锚点
-```
+```python
 def make_anchors(self, strides, grid_cell_offset=0.5):
     '''
     各特征图每个像素点一个锚点即Anchors, 即每个像素点只预测一个box
@@ -101,7 +101,7 @@ def make_anchors(self, strides, grid_cell_offset=0.5):
     return torch.cat(anc_points, dim=0), torch.cat(strides_tensor, dim=0)
 ```
 - anc_points : (8400, 2) ，每个像素中心点坐标
-```
+```python
 tensor([[0.5000, 0.5000],
         [1.5000, 0.5000],
         [2.5000, 0.5000],
@@ -189,8 +189,9 @@ tensor([[0.5000, 0.5000],
 ```
 可视化上述坐标点在三个尺度的特征图上
 ![](assets/out.png)
+
 - strides_tensor: (8400, 1) ，每个像素的缩放倍数
-```
+```python
 tensor([[ 80.],
         [ 80.],
         [ 80.],
@@ -278,7 +279,7 @@ tensor([[ 80.],
 ```
 
 ##### iii. 解码预测回归分布
-```
+```python
 def decode(self, pred_regs):
     '''
         预测结果解码
@@ -310,7 +311,7 @@ def decode(self, pred_regs):
 - 预测坐标位置，首先通过对16个分布值加权求和，得到的4个坐标值*表示anc_point中心点分别距离预测box的左上边(lt)与右下边(rb)的距离*, 然后转换为xmin, ymin, xmax, ymax的形式，方便后续的ciou的计算pred_bboxes.shape (b, 8400, 4), *这里可以看到预测结果实际是个相对值， 且此时的4个值都在特征值尺度下*。 
 
 #### 2. 标注结果预处理
-```
+```python
 def ann_process(self, annotations):
     '''
         batch内不同图像标注box个数可能不同，故进行对齐处理
@@ -353,7 +354,7 @@ def ann_process(self, annotations):
 输出结果</br>
 ![](assets/res.jpg)
 - 标注框坐标 gt_bboxes.shape (b, M, 4), 注意这里已经是原图尺度了
-```
+```python
 tensor([[[ 1.7856e+02,  9.2800e+01,  6.0480e+02,  3.3472e+02],
          [ 2.1760e+02, -3.2000e-01,  4.9024e+02,  6.9440e+01],
          [ 0.0000e+00,  0.0000e+00,  0.0000e+00,  0.0000e+00]],
@@ -371,7 +372,7 @@ tensor([[[ 1.7856e+02,  9.2800e+01,  6.0480e+02,  3.3472e+02],
          [ 0.0000e+00,  0.0000e+00,  0.0000e+00,  0.0000e+00]]])
 ```
 - 标注框类别 gt_labels.shape (b, M, 1)
-```
+```python
 tensor([[[1.],
          [0.],
          [0.]],
@@ -389,7 +390,7 @@ tensor([[[1.],
          [0.]]])
 ```
 - 是否为填充的标注框 gt_mask.shape (b, M, 1)
-```
+```python
 tensor([[[1.],
          [1.],
          [0.]],
@@ -409,7 +410,7 @@ tensor([[[1.],
 
 #### 3. 正负样本分配
 下面进入最重要的部分，正负样本分配。在开始进入流程之前，先来看下我们的输入都有什么。
-```
+```python
 target_bboxes, target_scores, fg_mask = self.assigner(pred_scores.detach().sigmoid(),
                                                       pred_bboxes.detach() * self.stride_scales,
                                                       self.anc_points * self.stride_scales,
@@ -427,7 +428,7 @@ target_bboxes, target_scores, fg_mask = self.assigner(pred_scores.detach().sigmo
 ##### a. 初步筛选
 assigner实际输入是有batch这个维度的，为了方便，实际代码中会对这个batch进行遍历，循环处理每一张图片，因此下面讲解的过程都可认为是对一张图片做的处理, 不需要考虑batch这个维度。</br>
 原则：*anchor_points落在gt_boxes内部，作为初步筛选的正样本。*
-```
+```python
 def __get_in_gts_mask(self,gt_bboxes,anc_points):
     # 找到M个GTBox的左上与右下坐标 M x 1 x 2
     gt_bboxes = gt_bboxes.view(-1,1,4)
@@ -443,7 +444,7 @@ def __get_in_gts_mask(self,gt_bboxes,anc_points):
 ```
 这里判断方式很简单，计算M个GT左上坐标和anc_points的距离，以及右下坐标和anc_points的距离，如果最小值都大于0,则说明该anchor_point落在了GT框中。
 - in_gts_mask.shape(M, 8400) 表示该anc_points是否落在GT中
-```
+```python
 tensor([[0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 1., 1., 1., 1., 1., 0., 0.,
          1., 1., 1., 1., 1., 1., 0., 0., 1., 1., 1., 1., 1., 1., 0., 0., 0., 0.,
          0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
@@ -462,7 +463,7 @@ tensor([[0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 1., 1., 1., 1., 1., 0., 0.,
 ```
 ##### b. 精细筛选
 初步筛选后的结果中仍然存在一部分负样本(虽然anchor_point在gtbox内部，但IOU过低或scores过低，并不是适合作为正样本)，需要进一步进行筛除
-```
+```python
 def __refine_select(self, pb_scores, pb_bboxes, gt_labels, gt_bboxes, gt_mask):
     # pb_scores (8400, cls_num)
     # pb_bboxes (8400, 4)
@@ -504,7 +505,7 @@ def __refine_select(self, pb_scores, pb_bboxes, gt_labels, gt_bboxes, gt_mask):
 ![](assets/1.jpg)
 形状同为(M, 8400)
 - align_metric, (M, 8400)
-```
+```python
  tensor([[0.0000e+00, 0.0000e+00, 0.0000e+00, 0.0000e+00, 0.0000e+00, 0.0000e+00,
          0.0000e+00, 0.0000e+00, 0.0000e+00, 0.0000e+00, 1.8529e-07, 1.1981e-08,
          4.5906e-08, 4.8564e-08, 3.5394e-08, 1.2538e-09, 0.0000e+00, 0.0000e+00,
@@ -549,7 +550,7 @@ def __refine_select(self, pb_scores, pb_bboxes, gt_labels, gt_bboxes, gt_mask):
          0.0000e+00, 0.0000e+00, 0.0000e+00, 0.0000e+00, 0.0000e+00, 0.0000e+00]])
 ```
 - gt_pb_cious , (M, 8400)
-```
+```python
 tensor([[0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
          0.0000, 0.0783, 0.0540, 0.0631, 0.0654, 0.0587, 0.0349, 0.0000, 0.0000,
          0.0613, 0.0474, 0.0723, 0.0728, 0.0675, 0.0625, 0.0000, 0.0000, 0.0389,
@@ -582,7 +583,7 @@ tensor([[0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
          0.0000, 0.0000, 0.0000]])
 ```
 使用得到的align_metric，选取topk个anchor作为正样本
-```
+```python
  def __select_topk_candidates(self, align_metric, gt_mask):
     # 从大到小排序,每个GT的从8400个结果中取前 topk个值，以及其中的对应索引
     # top_metrics :(M, topk)
@@ -600,7 +601,7 @@ tensor([[0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
 
 ```
 - topk_mask是一个01矩阵，1表示该anchor被选为正样本, 这里k=10
-```
+```python
 tensor([[0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 1., 1., 1., 0., 0., 0.,
          0., 0., 1., 1., 1., 1., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0., 0., 0.,
          0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
@@ -619,7 +620,7 @@ tensor([[0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 1., 1., 1., 0., 0., 0.,
 ```
 ##### c. 排除一个锚点被分配给多个GT box的情况
 一个anchor只能被分配给一个GT，若重复分配，则保留和GT的ciou最大的那个。
-```
+```python
 def __filter_repeat_assign_candidates(self, pos_mask, overlaps):
     '''
         pos_mask : (M, 8400)
@@ -657,14 +658,14 @@ def __filter_repeat_assign_candidates(self, pos_mask, overlaps):
 a. 通过对mask矩阵，每个anchor对于所有GT求和，查看值是否大于1，如大于1，这说明被分配给多个GT</br>
 b. 筛除多余分配的情况，原则： 通过观察该anchor与被多分配的每个GT的CIOU值，选择值最大者。
 - target_gt_idx: 8400 为每个anchor最匹配的GT索引(包含了正负样本)
-```
+```python
 tensor([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 ```
 - fg_mask: 8400 为每个anchor设置mask,用于区分正负样本
-```
+```python
 tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 0., 1., 1., 1., 0., 0., 0.,
         0., 0., 1., 1., 1., 1., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0., 0., 0.,
         0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
@@ -672,7 +673,7 @@ tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 0., 1., 1., 1., 0., 0., 0.,
         0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.])
 ```
 - pos_mask: (M, 8400)  每张图像中每个GT设置正负样本的mask 
-```
+```python
 pos_mask: tensor([[0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 1., 1., 1., 0., 0., 0.,
          0., 0., 1., 1., 1., 1., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0., 0., 0.,
          0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
@@ -690,7 +691,7 @@ pos_mask: tensor([[0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 1., 1., 1., 0
          0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]])
 ```
 ##### d. 获得筛选样本的训练标签
-```
+```python
 def __get_train_targets(self, gt_labels, gt_bboxes, target_gt_idx, fg_mask):
     '''
         gt_labels: (M, 1) 
@@ -724,7 +725,7 @@ def __get_train_targets(self, gt_labels, gt_bboxes, target_gt_idx, fg_mask):
 ```
 生成最后的标签结果
 - target_one_hot_labels (8400, 3)
-```
+```python
 tensor([[1, 0, 0],
         [1, 0, 0],
         [1, 0, 0],
@@ -811,7 +812,7 @@ tensor([[1, 0, 0],
         [0, 0, 0]])
 ```
 - target_bboxes (84, 4)
-```
+```python
 tensor([[ 2.1760e+02, -3.2000e-01,  4.9024e+02,  6.9440e+01],
         [ 2.1760e+02, -3.2000e-01,  4.9024e+02,  6.9440e+01],
         [ 2.1760e+02, -3.2000e-01,  4.9024e+02,  6.9440e+01],
@@ -898,7 +899,7 @@ tensor([[ 2.1760e+02, -3.2000e-01,  4.9024e+02,  6.9440e+01],
         [ 1.7856e+02,  9.2800e+01,  6.0480e+02,  3.3472e+02]])
 ```
 注意这里target_score有用fg_mask进行过滤，但是target_bboxes没有处理。实际计算loss的时候才会用fg_mask对target_bboxes进行过滤。
-```
+```python
 class BboxLoss(nn.Module):
     def __init__(self, reg_max, use_dfl=False):
         """Initialize the BboxLoss module with regularization maximum and DFL settings."""
